@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- This title is not used. -->
+    <title>Top Users</title> 
+    
+    <!-- Use Bootstrap to match the look of OU Campus. -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+    
+    <style type="text/css">
+        body {
+            margin: 10px;
+            background-color: transparent;
+        }
+    </style>
+    
+    <!-- jQuery IS REQUIRED for gadgetlib.js to work. -->
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.2.0.min.js"></script>
+    
+    <!-- 
+        gadgetlib.js is a library of basic functions that gadgets can use. It creates a global
+        `gadget` object that has a few useful methods. (See comments in gadgetlib.js.)
+    -->
+    <script type="text/javascript" src="lib/gadgetlib.js"></script>
+	<script type="text/javascript" src="lib/moment.js"></script>
+    
+    <script type="text/javascript">
+        $(document).ready(function () {
+            /* 
+                First, call `gadget.ready()` to make sure the gadget has obtained an API token
+                to use for making OU Campus API calls. If your gadget will not make any API calls,
+                you can dispense with this method. This asynchronous method returns a jQuery
+                Promise object.
+                
+                Then, call `gadget.fetch()` to get the gadget's config data from the system. This
+                method, which also returns a jQuery Promise object, uses the API, which is why it
+                needs to follow the call to `gadget.ready()`.
+                
+                If you don't need the config data, you don't need to call gadget.fetch().
+            */
+            gadget.ready().then(gadget.fetch).then(function () {
+                $('#main').css({ 'font-size': gadget.getConfig('font_size') });
+            });
+        });
+		
+        $(gadget).on({
+            'expanded': function (evt) {
+                // This event is triggered when the user expands (makes visible) a sidebar gadget.
+				var activities_list = [];
+				var lastDate = moment();
+				var num_loaded = 0;
+				
+				function getActivities(x){
+				   var d = $.Deferred();
+					var apiHost = gadget.get('apihost');
+					var authToken = {"authorization_token":gadget.get('token')};
+					$.ajax({
+						type: 'GET',
+						url:apiHost + "/activity/list?site=outc16&count=50&start=" + x,
+						data:authToken,
+						success:function(result){
+							for (var i = 0; i < result.length; i++) { 
+								lastDate = moment(result[i].date_format, "M/DD/YY h:mm A");
+								if(moment(result[i].date_format, "M/DD/YY h:mm A") > moment().subtract(1, 'months')){
+									activities_list.push(result[i]);
+									num_loaded++;
+								}
+							}
+							d.resolve(activities_list);
+						},
+						error:function(jqxhr, textStatus, error ) {
+							var err = textStatus + ", " + error;
+							console.log( "Request Failed: " + err );
+							return d.resolve([]);
+						}
+					});
+					return d;
+				}
+				
+				function organizeByUser(activities){
+					var users = [];
+					for (var i = 0; i < activities.length; i++) {
+						var userIndex =  searchListDictionaries(users,{user:activities[i].username},true);
+						if(userIndex === -1){
+							users.push({user:activities[i].username,activities:[activities[i]]});
+						}
+						else{
+							var user = users[userIndex];
+							user.activities.push(users[userIndex]);
+						}
+					}
+					return users;
+				}
+
+				function searchListDictionaries (list,keyvaluelist,bool_index){
+					var bool_index = typeof bool_index !== 'undefined' ?  bool_index : false;
+					try{
+						var numcriterion = 0;
+						for (var key in keyvaluelist) {
+							numcriterion++;
+						}
+						for(var i = 0; i < list.length; i++){
+							var counter = 0;
+							for (var key in keyvaluelist) {
+								if(list[i][key] == keyvaluelist[key]){
+									counter++;
+									if(counter == numcriterion){
+										if(bool_index){return i;}
+										else{return list[i];}
+									}
+								}
+							}
+						}
+						if(bool_index){return -1;}else{return null;}
+					}
+					catch(err){
+						if(bool_index){return -1;}else{return null;}
+					}
+				}
+				
+				function orderUsers(users, asc){
+					var asc = typeof asc !== 'undefined' ?  asc : true;
+					users.sort(function(a, b) { 
+						if(asc === true){
+							return a.activities.length - b.activities.length;
+						}
+						else{
+							return b.activities.length - a.activities.length;
+						}
+					});
+					return users;
+				}
+
+				(function recurse(i,l) {
+					getActivities(i).then(function() {
+						if(lastDate>moment().subtract(1, 'months') && i != num_loaded){
+							num_loaded = activities_list.length - 1;
+							recurse(num_loaded,activities_list);
+						}
+						else{
+							var users = organizeByUser(activities_list);
+							var orderedUsers = orderUsers(users,false);
+							var output = "";
+							output += "<h3><u>Top Users</u></h3>";
+							for(var c = 0; (c < orderedUsers.length) && (c < 5); c++){
+								output += "User: " + orderedUsers[c].user + "<br>";
+								output += "Activities: " + orderedUsers[c].activities.length + "<br>";
+								output += "<br>";
+							}
+							$("#main").html(output);
+						}
+					});
+				})(num_loaded,activities_list);
+
+			},
+			'configuration': function (evt, config) {
+				// If the user changes the gadget's configuration through the configuration modal,
+				// the gadget will hear about it and get the new config in the data argument here.
+				$('#main').css({ 'font-size': config.font_size });
+			}
+		});
+    </script>
+</head>
+<body>
+    <div id="main">
+		Loading. <img src="loading.gif"/>
+    </div>
+    <!--
+        The following hidden div is only needed if you'll be editing your gadget in
+        OU Campus's source code editor. OU Campus automatically adds a DirectEdit link
+        to HTML files that you edit in OU Campus. This div hides the DirectEdit link.
+    -->
+    <div style="display:none">
+        <!-- ouc:ob --><!-- /ouc:ob -->
+    </div>
+</body>
+</html>
