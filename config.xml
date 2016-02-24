@@ -36,6 +36,8 @@
          apply to custom entries too. -->
     <entry key="font_size" label="Font Size" overwritable="true">14px</entry>
 
+    <entry key="num_users" label="Number of Users to show" overwritable="true">5</entry>
+
 </config>
 
 

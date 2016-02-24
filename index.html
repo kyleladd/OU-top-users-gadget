@@ -142,7 +142,7 @@
 							var orderedUsers = orderUsers(users,false);
 							var output = "";
 							output += "<h3><u>Top Users</u></h3>";
-							for(var c = 0; (c < orderedUsers.length) && (c < 5); c++){
+							for(var c = 0; (c < orderedUsers.length) && (c < parseInt(gadget.getConfig('num_users'))); c++){
 								output += "User: " + orderedUsers[c].user + "<br>";
 								output += "Activities: " + orderedUsers[c].activities.length + "<br>";
 								output += "<br>";
